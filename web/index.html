@@ -1,0 +1,92 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Baixar vídeo do Instagram e TikTok</title>
+  <meta name="description" content="Cole o link de um Reel ou vídeo do TikTok e baixe em MP4 na melhor qualidade disponível, sem marca d'água.">
+  <meta name="theme-color" content="#f3f4f0" media="(prefers-color-scheme: light)">
+  <meta name="theme-color" content="#12161c" media="(prefers-color-scheme: dark)">
+  <link rel="icon" href="favicon.svg" type="image/svg+xml">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="tool.css">
+  <style>
+    html { background: var(--paper); }
+    body { margin: 0; background: var(--paper); color: var(--ink); font-family: var(--font); }
+    .page { max-width: 640px; margin: 0 auto; padding: 0 16px; min-height: 100dvh; display: flex; flex-direction: column; }
+    .top { padding: 22px 0 0; }
+    .top a { color: var(--muted); text-decoration: none; font-size: .95rem; }
+    .top a:hover { color: var(--ink); text-decoration: underline; }
+    h1 {
+      margin: clamp(40px, 10vh, 96px) 0 28px;
+      font-size: clamp(2.6rem, 9vw, 4.4rem); line-height: .95; letter-spacing: -0.02em;
+      font-weight: 800; font-stretch: 78%; font-variation-settings: "opsz" 96;
+      text-wrap: balance;
+    }
+    h1 .line2 { display: block; color: var(--accent); }
+    .faq { margin: 56px 0 0; border-top: 1px solid var(--line); }
+    .faq details { border-bottom: 1px solid var(--line); }
+    .faq summary {
+      cursor: pointer; padding: 16px 0; font-weight: 600; list-style: none;
+      display: flex; justify-content: space-between; gap: 16px;
+    }
+    .faq summary::-webkit-details-marker { display: none; }
+    .faq summary::after { content: "+"; font-weight: 400; font-size: 1.3rem; line-height: 1; color: var(--muted); }
+    .faq details[open] summary::after { content: "−"; }
+    .faq p { margin: 0 0 18px; color: var(--muted); max-width: 60ch; }
+    footer { margin-top: auto; padding: 48px 0 28px; color: var(--muted); font-size: .88rem; }
+    footer p { margin: 0; max-width: 60ch; }
+  </style>
+</head>
+<body>
+  <div class="page">
+    <header class="top">
+      <!-- Troque pelo endereço do seu site pessoal -->
+      <a href="/" id="home-link">Início</a>
+    </header>
+
+    <main>
+      <h1>Cole o link. <span class="line2">Baixe o vídeo.</span></h1>
+
+      <div class="vdl-tabs" role="tablist" aria-label="Modo" data-vdl-tabs>
+        <button class="vdl-tab" role="tab" id="tab-um" aria-controls="painel-um">Um vídeo</button>
+        <button class="vdl-tab" role="tab" id="tab-lote" aria-controls="painel-lote">Vários vídeos</button>
+      </div>
+      <div class="vdl-panel" id="painel-um" role="tabpanel" aria-labelledby="tab-um"><div data-vdl></div></div>
+      <div class="vdl-panel" id="painel-lote" role="tabpanel" aria-labelledby="tab-lote" hidden><div data-vdl-batch></div></div>
+
+      <section class="faq" aria-label="Dúvidas frequentes">
+        <details>
+          <summary>Em que qualidade o vídeo é baixado?</summary>
+          <p>Na maior que a plataforma entrega, sem marca d'água: normalmente 1080p no Instagram e até 1080p no TikTok. Nenhuma ferramenta consegue mais que isso, porque o Instagram e o TikTok comprimem o vídeo original quando ele é postado.</p>
+        </details>
+        <details>
+          <summary>Como funciona o download de vários vídeos?</summary>
+          <p>Cole links de vídeos ou de perfis, um por linha. Também vale só o @ do perfil, escolhendo se é do TikTok ou do Instagram. De perfis do TikTok vêm os vídeos mais recentes; de perfis do Instagram, só os Reels. Os vídeos são baixados um de cada vez e, no fim, saem todos juntos num arquivo .zip ou um por um.</p>
+        </details>
+        <details>
+          <summary>O que significa HEVC?</summary>
+          <p>É um formato de vídeo mais moderno que o TikTok usa nas versões de maior qualidade. Abre normalmente em celulares, Mac e na maioria dos PCs, mas alguns computadores com Windows precisam de uma extensão. Se o vídeo não abrir, baixe a opção sem essa indicação.</p>
+        </details>
+        <details>
+          <summary>Por que o vídeo não foi encontrado?</summary>
+          <p>Só dá para baixar vídeos públicos. Contas privadas, stories que já expiraram, posts apagados ou com restrição de idade não funcionam. Às vezes a plataforma também bloqueia por alguns minutos; nesse caso, espere e tente de novo.</p>
+        </details>
+        <details>
+          <summary>Os vídeos ficam guardados aqui?</summary>
+          <p>Não. O arquivo existe no servidor só durante o download e é apagado logo depois de chegar até você.</p>
+        </details>
+      </section>
+    </main>
+
+    <footer>
+      <p>Baixe apenas vídeos seus ou com permissão de quem os criou. Esta ferramenta não tem ligação com o Instagram nem com o TikTok.</p>
+    </footer>
+  </div>
+  <script src="tool.js" defer></script>
+  <script src="batch.js" defer></script>
+  <script src="tabs.js" defer></script>
+</body>
+</html>

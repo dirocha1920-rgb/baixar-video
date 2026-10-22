@@ -1,0 +1,7 @@
+starlette>=0.46,<2
+uvicorn[standard]>=0.30
+# 2026.06.09+ corrige a CVE-2026-50019 (vazamento de cookies)
+# curl-cffi: imita um navegador real, o que reduz bloqueios do TikTok/Instagram
+yt-dlp[default,curl-cffi]>=2026.6.9
+# Lista a aba Reels de perfis do Instagram (o yt-dlp não lista perfis do Instagram)
+gallery-dl>=1.32.17

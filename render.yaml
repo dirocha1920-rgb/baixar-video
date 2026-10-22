@@ -1,0 +1,29 @@
+# Render (render.com): New > Blueprint > selecione este repositório.
+# O plano gratuito serve para testar: dorme após 15 min sem uso e tem 5 GB de banda/mês.
+services:
+  - type: web
+    name: baixar-video
+    runtime: docker
+    plan: free
+    healthCheckPath: /health
+    envVars:
+      # O Render pergunta este valor ao criar: cole o endereço do seu site na Vercel
+      # (ex.: https://meu-site.vercel.app). Vários? Separe com vírgula.
+      - key: ALLOWED_ORIGINS
+        sync: false
+      - key: TRUST_PROXY_HOPS
+        value: "2"          # Render acrescenta o próprio IP ao X-Forwarded-For
+      - key: MAX_CONCURRENT_DOWNLOADS
+        value: "1"          # instância gratuita tem 512 MB e 0,1 CPU
+      - key: DOWNLOADS_PER_HOUR
+        value: "20"
+      - key: BATCH_MAX_PER_PROFILE
+        value: "25"         # economiza os 5 GB de banda do plano grátis
+      - key: BATCH_MAX_ITEMS
+        value: "50"
+      - key: BATCH_MIN_FREE_MB
+        value: "300"
+      - key: AUTO_UPDATE_YTDLP
+        value: "1"
+      # Opcional (Instagram): envie os cookies em "Secret Files" com o nome instagram.txt
+      # e crie a variável COOKIES_FILE=/etc/secrets/instagram.txt no painel do Render.

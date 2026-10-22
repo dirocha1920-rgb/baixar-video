@@ -1,0 +1,46 @@
+<!doctype html>
+<html lang="pt-BR">
+<head>
+  <meta charset="utf-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1">
+  <title>Baixar vídeo</title>
+  <meta name="robots" content="noindex">
+  <link rel="preconnect" href="https://fonts.googleapis.com">
+  <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+  <link href="https://fonts.googleapis.com/css2?family=Bricolage+Grotesque:opsz,wdth,wght@12..96,75..100,400..800&display=swap" rel="stylesheet">
+  <link rel="stylesheet" href="/tool.css">
+  <style>
+    /* Fundo transparente para se misturar ao site que contém o iframe.
+       Use ?theme=light ou ?theme=dark para forçar um tema. */
+    html, body { margin: 0; background: transparent; }
+    body { padding: 4px; font-family: var(--font); color: var(--ink); }
+    .note { margin: 14px 2px 0; font-size: .82rem; color: var(--muted); }
+  </style>
+</head>
+<body>
+  <div class="vdl-tabs" role="tablist" aria-label="Modo" data-vdl-tabs>
+    <button class="vdl-tab" role="tab" id="tab-um" aria-controls="painel-um">Um vídeo</button>
+    <button class="vdl-tab" role="tab" id="tab-lote" aria-controls="painel-lote">Vários vídeos</button>
+  </div>
+  <div class="vdl-panel" id="painel-um" role="tabpanel" aria-labelledby="tab-um"><div data-vdl id="tool"></div></div>
+  <div class="vdl-panel" id="painel-lote" role="tabpanel" aria-labelledby="tab-lote" hidden><div data-vdl-batch></div></div>
+  <p class="note">Baixe apenas vídeos seus ou com permissão de quem os criou.</p>
+  <script>
+    (function () {
+      var t = new URLSearchParams(location.search).get("theme");
+      if (t === "light" || t === "dark") document.documentElement.setAttribute("data-theme", t);
+      // Informa a altura ao site que contém o iframe (para não aparecer barra de rolagem)
+      function send() {
+        if (window.parent === window) return;
+        window.parent.postMessage({ type: "vdl:height", height: document.documentElement.scrollHeight }, "*");
+      }
+      document.addEventListener("vdl:resize", function () { requestAnimationFrame(send); });
+      window.addEventListener("load", send);
+      if (window.ResizeObserver) new ResizeObserver(send).observe(document.body);
+    })();
+  </script>
+  <script src="/tool.js" defer></script>
+  <script src="/batch.js" defer></script>
+  <script src="/tabs.js" defer></script>
+</body>
+</html>

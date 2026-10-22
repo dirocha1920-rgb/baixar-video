@@ -1,0 +1,39 @@
+# Servidor próprio (VPS): app + Caddy com HTTPS automático.
+#   1. Aponte o DNS do domínio para o IP do servidor
+#   2. cp .env.example .env  e preencha DOMINIO
+#   3. docker compose up -d --build
+services:
+  app:
+    build: .
+    restart: unless-stopped
+    env_file: .env
+    environment:
+      TRUST_PROXY_HOPS: "1"
+    volumes:
+      # Opcional: arquivo de cookies do Instagram (veja o README)
+      - ./cookies:/app/cookies:ro
+      # Vídeos em andamento e lotes prontos (apagados sozinhos depois de BATCH_TTL_MINUTES)
+      - downloads:/tmp/vdl
+    expose:
+      - "8000"
+
+  caddy:
+    image: caddy:2
+    restart: unless-stopped
+    depends_on:
+      - app
+    ports:
+      - "80:80"
+      - "443:443"
+      - "443:443/udp"
+    env_file: .env
+    volumes:
+      - ./deploy/Caddyfile:/etc/caddy/Caddyfile:ro
+      - ./meu-site:/srv/meu-site:ro
+      - caddy_data:/data
+      - caddy_config:/config
+
+volumes:
+  downloads:
+  caddy_data:
+  caddy_config:

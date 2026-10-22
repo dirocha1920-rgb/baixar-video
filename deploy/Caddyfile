@@ -1,0 +1,26 @@
+# Caddy gera e renova o certificado HTTPS sozinho.
+
+# A ferramenta (ex.: baixar.seusite.com.br)
+{$DOMINIO} {
+	encode zstd gzip
+	reverse_proxy app:8000 {
+		# Não bufferiza: o vídeo vai direto para o visitante
+		flush_interval -1
+		transport http {
+			response_header_timeout 5m
+		}
+	}
+	header {
+		Strict-Transport-Security "max-age=31536000"
+		-Server
+	}
+}
+
+# Opcional: seu site pessoal no mesmo servidor (ex.: seusite.com.br).
+# Coloque os arquivos do site na pasta meu-site/, defina DOMINIO_SITE no .env
+# e tire o "#" das 5 linhas abaixo.
+# {$DOMINIO_SITE} {
+# 	root * /srv/meu-site
+# 	encode zstd gzip
+# 	file_server
+# }
