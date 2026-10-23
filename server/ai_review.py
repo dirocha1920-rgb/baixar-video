@@ -224,7 +224,8 @@ def _api_error(status: int, body: bytes) -> ReviewError:
         return ReviewError("A cota da IA no Google acabou por agora (limite do plano). Tente de novo em alguns minutos.", 503)
     if status == 400 and "location" in message.lower():
         return ReviewError("O Google não liberou a API do Gemini para a região deste servidor.", 502)
-    return ReviewError("A IA não conseguiu analisar este arquivo agora. Tente de novo em instantes.", 502)
+    detail = f" (Google {status}: {message[:220]})" if message else f" (Google {status})"
+    return ReviewError("A IA não conseguiu analisar este arquivo agora." + detail, 502)
 
 
 def upload_file(path: str, mime: str, key: str) -> dict:
@@ -273,9 +274,47 @@ def delete_file(file: dict, key: str) -> None:
         pass
 
 
+_MODEL_CACHE: dict = {}
+
+
+def available_models(key: str) -> list[str]:
+    """Lista os modelos Flash que esta chave pode usar (do mais novo para o mais antigo)."""
+    if _MODEL_CACHE.get("t", 0) > time.time() - 3600:
+        return _MODEL_CACHE["models"]
+    names, page = [], ""
+    for _ in range(5):
+        status, _, body = _request("GET", f"{BASE}/v1beta/models?pageSize=200" + (f"&pageToken={page}" if page else ""), {"x-goog-api-key": key}, timeout=30)
+        if status >= 300:
+            break
+        data = json.loads(body)
+        for m in data.get("models", []):
+            name = m.get("name", "").replace("models/", "")
+            if "generateContent" in (m.get("supportedGenerationMethods") or []) and "flash" in name and not any(x in name for x in ("image", "tts", "audio", "live", "thinking", "exp")):
+                names.append(name)
+        page = data.get("nextPageToken") or ""
+        if not page:
+            break
+
+    def rank(n: str):
+        import re
+        v = re.findall(r"(\d+(?:\.\d+)?)", n)
+        ver = float(v[0]) if v else 0
+        return (("lite" not in n), ("preview" not in n), ver)
+    names = sorted(set(names), key=rank, reverse=True)
+    _MODEL_CACHE.update(t=time.time(), models=names)
+    log.info("modelos disponíveis: %s", ", ".join(names[:8]))
+    return names
+
+
 def generate(parts: list, key: str) -> tuple[dict, str]:
     preferred = (os.getenv("GEMINI_MODEL") or "").strip()
     models = [m for m in [preferred] + FALLBACK_MODELS if m]
+    try:
+        found = available_models(key)
+        if found:
+            models = [m for m in [preferred] if m and m in found] + [m for m in FALLBACK_MODELS if m in found] + found
+    except Exception:  # noqa: BLE001 - segue com a lista padrão
+        pass
     seen = []
     payload = {
         "system_instruction": {"parts": [{"text": RULES}]},
@@ -290,6 +329,13 @@ def generate(parts: list, key: str) -> tuple[dict, str]:
         status, _, body = _request("POST", f"{BASE}/v1beta/models/{model}:generateContent", {
             "x-goog-api-key": key, "Content-Type": "application/json",
         }, json.dumps(payload).encode(), timeout=300)
+        if status == 400 and b"schema" in body.lower() and "responseSchema" in payload["generationConfig"]:
+            # alguns modelos não aceitam o formato de resposta estruturada: tenta só com JSON
+            payload["generationConfig"].pop("responseSchema", None)
+            payload["contents"][0]["parts"][-1]["text"] += "\nFormato do JSON: " + json.dumps(SCHEMA, ensure_ascii=False)
+            status, _, body = _request("POST", f"{BASE}/v1beta/models/{model}:generateContent", {
+                "x-goog-api-key": key, "Content-Type": "application/json",
+            }, json.dumps(payload).encode(), timeout=300)
         if status == 404 or (status == 400 and b"not found" in body.lower()):
             last_error = _api_error(status, body)
             continue  # modelo não existe para esta chave: tenta o próximo
