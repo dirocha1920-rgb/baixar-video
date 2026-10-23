@@ -16,11 +16,16 @@ Rotas:
   GET  /api/batch/{id}/file/{n}   um vídeo do lote
   GET  /api/batch/{id}/zip        todos os vídeos prontos num .zip
 
+  Revisão com IA:
+  GET  /api/review/config   se a IA está ligada, se pede senha, quantas análises restam
+  POST /api/review          (multipart) arquivo + plataformas + texto -> laudo da IA
+
   GET  /health              status + versão do yt-dlp
 """
 from __future__ import annotations
 
 import contextlib
+import json
 import logging
 import os
 import shutil
@@ -41,6 +46,7 @@ from starlette.responses import FileResponse, JSONResponse, Response, StreamingR
 from starlette.routing import Mount, Route
 from starlette.staticfiles import StaticFiles
 
+import ai_review
 import batch
 import downloader as dl
 import profiles
@@ -377,6 +383,87 @@ async def api_batch_zip(request: Request) -> Response:
     )
 
 
+# ---------------------------------------------------------------------------
+# Revisão de criativos com IA
+# ---------------------------------------------------------------------------
+REVIEW_SLOTS = threading.BoundedSemaphore(_int("REVIEW_CONCURRENT", 2))
+
+
+async def api_review_config(request: Request) -> JSONResponse:
+    return JSONResponse({
+        "enabled": bool(ai_review.api_key()),
+        "requires_code": bool(ai_review.access_code()),
+        "remaining": ai_review.COUNTER.remaining(client_ip(request)),
+        "max_mb": ai_review.max_bytes() // (1024 * 1024),
+    }, headers={"Cache-Control": "no-store"})
+
+
+def _review_sync(path, filename, ctype, platforms, sector, texts, specs):
+    if not REVIEW_SLOTS.acquire(timeout=60):
+        raise ai_review.ReviewError("Muita gente usando a IA agora. Tente de novo em um minuto.", 503)
+    try:
+        return ai_review.review(path, filename, ctype, platforms, sector, texts, specs)
+    finally:
+        REVIEW_SLOTS.release()
+
+
+async def api_review(request: Request) -> Response:
+    if (r := check_rate(request)) is not None:
+        return r
+    if not ai_review.api_key():
+        return error("A análise com IA ainda não foi ligada neste servidor (falta a GEMINI_API_KEY).", 503)
+    try:
+        form = await request.form(max_files=1, max_fields=10)
+    except Exception:  # noqa: BLE001
+        return error("Envio inválido.", 400)
+    code = ai_review.access_code()
+    if code and (form.get("code") or "").strip() != code:
+        return error("Senha da análise com IA incorreta.", 403)
+    upload = form.get("file")
+    if upload is None or not hasattr(upload, "read"):
+        return error("Envie o arquivo do criativo.", 400)
+    try:
+        platforms = json.loads(form.get("platforms") or "{}")
+        texts = json.loads(form.get("texts") or "{}")
+        platforms = {k: (str(v)[:20] if v else None) for k, v in platforms.items() if k in ("meta", "tiktok", "kwai")}
+        texts = {k: str(v)[:2500] for k, v in texts.items() if k in ("primary", "headline", "description", "name")}
+    except (ValueError, AttributeError):
+        return error("Dados do anúncio inválidos.", 400)
+    sector = str(form.get("sector") or "")[:60]
+    specs = str(form.get("specs") or "")[:800]
+    ip = client_ip(request)
+    tmp_dir = Path(SETTINGS.tmp_root) / "review"
+    tmp_dir.mkdir(parents=True, exist_ok=True)
+    tmp = tmp_dir / f"rv_{int(time.time() * 1000)}_{threading.get_ident()}"
+    size, limit = 0, ai_review.max_bytes()
+    try:
+        with open(tmp, "wb") as out:
+            while chunk := await upload.read(1024 * 1024):
+                size += len(chunk)
+                if size > limit:
+                    return error(f"Arquivo grande demais para a IA (máximo {limit // 1048576} MB).", 413)
+                out.write(chunk)
+        try:
+            ai_review.COUNTER.take(ip)
+        except ai_review.ReviewError as e:
+            return error(e.message, e.status)
+        try:
+            result = await run_in_threadpool(_review_sync, str(tmp), upload.filename or "criativo", upload.content_type or "", platforms, sector, texts, specs)
+        except ai_review.ReviewError as e:
+            if e.status >= 500:
+                ai_review.COUNTER.give_back(ip)
+            return error(e.message, e.status)
+        except Exception:  # noqa: BLE001
+            ai_review.COUNTER.give_back(ip)
+            log.exception("erro inesperado em /api/review")
+            return error("Erro inesperado na análise. Tente novamente.", 500)
+        result["restantes"] = ai_review.COUNTER.remaining(ip)
+        return JSONResponse(result, headers={"Cache-Control": "no-store"})
+    finally:
+        with contextlib.suppress(OSError):
+            tmp.unlink()
+
+
 class Pages(StaticFiles):
     """Arquivos do site com cabeçalhos de segurança e cache sensato."""
 
@@ -400,6 +487,7 @@ async def lifespan(_app):
     Path(SETTINGS.tmp_root).mkdir(parents=True, exist_ok=True)
     dl.cleanup_stale(SETTINGS.tmp_root, older_than=0)
     BATCH.start()
+    log.info("IA: %s", "ligada" if ai_review.api_key() else "desligada (sem GEMINI_API_KEY)")
     log.info("yt-dlp %s | cookies: %s | downloads simultâneos: %d | sites liberados: %s",
              yt_dlp.version.__version__, "sim" if SETTINGS.cookies_file else "não", MAX_CONCURRENT,
              ", ".join(ALLOWED_ORIGINS) or "nenhum (só a própria página)")
@@ -417,6 +505,8 @@ routes = [
     Route("/api/batch/{job_id:str}/cancel", api_batch_cancel, methods=["POST"]),
     Route("/api/batch/{job_id:str}/file/{index:int}", api_batch_file),
     Route("/api/batch/{job_id:str}/zip", api_batch_zip),
+    Route("/api/review/config", api_review_config),
+    Route("/api/review", api_review, methods=["POST"]),
     Route("/embed", embed),
 ]
 if WEB_DIR.is_dir():
